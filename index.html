@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AI Chat Assistant - Teja</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            padding: 10px;
+        }
+        .container {
+            width: 100%;
+            max-width: 700px;
+            height: 90vh;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+        }
+        .header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 20px;
+            text-align: center;
+        }
+        .header h1 { font-size: 24px; margin-bottom: 5px; }
+        .header p { font-size: 14px; opacity: 0.9; }
+        .messages {
+            flex: 1;
+            padding: 20px;
+            overflow-y: auto;
+            background: #f5f5f5;
+        }
+        .message {
+            margin-bottom: 15px;
+            padding: 12px 16px;
+            border-radius: 18px;
+            max-width: 85%;
+            word-wrap: break-word;
+            animation: fadeIn 0.3s;
+            line-height: 1.5;
+        }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+        .message.user {
+            background: #667eea;
+            color: white;
+            margin-left: auto;
+        }
+        .message.ai {
+            background: white;
+            color: #333;
+            border: 2px solid #e0e0e0;
+        }
+        .message.system {
+            background: #fff3cd;
+            color: #856404;
+            text-align: center;
+            margin: 10px auto;
+            font-size: 14px;
+        }
+        .input-area {
+            display: flex;
+            padding: 15px;
+            background: white;
+            border-top: 2px solid #e0e0e0;
+            gap: 10px;
+        }
+        .input-area input {
+            flex: 1;
+            padding: 12px 16px;
+            border: 2px solid #e0e0e0;
+            border-radius: 25px;
+            font-size: 16px;
+            outline: none;
+        }
+        .input-area input:focus { border-color: #667eea; }
+        .input-area button {
+            padding: 12px 25px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            border: none;
+            border-radius: 25px;
+            font-size: 16px;
+            font-weight: bold;
+            cursor: pointer;
+            transition: transform 0.2s;
+        }
+        .input-area button:hover { transform: scale(1.05); }
+        .input-area button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: scale(1);
+        }
+        .footer {
+            padding: 10px;
+            text-align: center;
+            font-size: 12px;
+            color: #666;
+            background: #f5f5f5;
+            border-top: 1px solid #e0e0e0;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>🤖 AI Chat Assistant</h1>
+            <p>Powered by Hugging Face AI Models</p>
+        </div>
+        <div class="messages" id="messages">
+            <div class="message system">👋 Welcome! I'm your AI assistant. Ask me anything!</div>
+        </div>
+        <div class="input-area">
+            <input type="text" id="input" placeholder="Type your message..." autocomplete="off">
+            <button id="send">Send</button>
+        </div>
+        <div class="footer">
+            Created by Teja | AI Model: BlenderBot
+        </div>
+    </div>
+    <script>
+        const API_KEY = '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';
+        const messages = document.getElementById('messages');
+        const input = document.getElementById('input');
+        const send = document.getElementById('send');
+        
+        function addMsg(text, type) {
+            const div = document.createElement('div');
+            div.className = `message ${type}`;
+            div.textContent = text;
+            messages.appendChild(div);
+            messages.scrollTop = messages.scrollHeight;
+        }
+        
+        async function callAI(message) {
+            try {
+                const response = await fetch('https://api-inference.huggingface.co/models/facebook/blenderbot-400M-distill', {
+                    method: 'POST',
+                    headers: {
+                        'Authorization': `Bearer ${API_KEY}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({
+                        inputs: message,
+                        parameters: {
+                            max_length: 200,
+                            min_length: 20,
+                            temperature: 0.9
+                        },
+                        options: {
+                            wait_for_model: true
+                        }
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.error) {
+                    if (data.error.includes('loading')) {
+                        return "🔄 AI model is loading (20-30 seconds). Please try again!";
+                    }
+                    return getSmartResponse(message);
+                }
+                
+                if (Array.isArray(data) && data[0]?.generated_text) {
+                    return data[0].generated_text.trim();
+                }
+                
+                if (data.generated_text) {
+                    return data.generated_text.trim();
+                }
+                
+                return getSmartResponse(message);
+                
+            } catch (error) {
+                return getSmartResponse(message);
+            }
+        }
+        
+        function getSmartResponse(msg) {
+            const m = msg.toLowerCase();
+            
+            if (m.includes('hello') || m.includes('hi') || m.includes('hey') || m.includes('hii')) {
+                return "Hello! 👋 I'm your AI assistant. How can I help you today?";
+            }
+            
+            if (m.includes('who are you') || m.includes('what are you')) {
+                return "I'm an AI assistant powered by Facebook's BlenderBot model. I'm designed to have natural conversations and help answer your questions. What would you like to talk about?";
+            }
+            
+            if (m.includes('what is ai') || m.includes('artificial intelligence')) {
+                return "Artificial Intelligence (AI) is technology that enables machines to simulate human intelligence. This includes learning from data, understanding language, recognizing patterns, and making decisions. AI powers virtual assistants, recommendation systems, autonomous vehicles, and much more. Would you like to know about a specific AI application?";
+            }
+            
+            if (m.includes('how are you')) {
+                return "I'm doing great, thank you for asking! I'm here and ready to help you. How are you doing?";
+            }
+            
+            if (m.includes('help')) {
+                return "I'm here to help! 😊 You can ask me about technology, AI, science, general knowledge, or just have a friendly conversation. What would you like to know?";
+            }
+            
+            if (m.includes('thank')) {
+                return "You're very welcome! 😊 Happy to help. Feel free to ask me anything else!";
+            }
+            
+            if (m.includes('bye') || m.includes('goodbye')) {
+                return "Goodbye! 👋 It was nice chatting with you. Come back anytime!";
+            }
+            
+            return `I understand you're asking about "${msg}". I'm here to help with various topics. The AI model may take a moment to load on first use. Try asking again or rephrase your question!`;
+        }
+        
+        async function sendMsg() {
+            const msg = input.value.trim();
+            if (!msg) return;
+            
+            addMsg(msg, 'user');
+            input.value = '';
+            send.disabled = true;
+            
+            addMsg('Thinking...', 'system');
+            const thinkingMsg = messages.lastChild;
+            
+            const reply = await callAI(msg);
+            messages.removeChild(thinkingMsg);
+            addMsg(reply, 'ai');
+            
+            send.disabled = false;
+            input.focus();
+        }
+        
+        send.onclick = sendMsg;
+        input.onkeypress = (e) => { if (e.key === 'Enter') sendMsg(); };
+        input.focus();
+    </script>
+</body>
+</html>
